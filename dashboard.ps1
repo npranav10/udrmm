@@ -1,29 +1,63 @@
 Get-UDDashboard | Stop-UDDashboard
 
+
 Import-Module (Join-Path $PSScriptRoot 'HomeComputerFunctions.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'RemoteComputerFunctions.psm1') -Force
 
 $HomePageContent = {
-    New-UDRow -Endpoint {
-        New-UDColumn -Size 3 -Content {
-            New-UDCard -Title "192.168.0.102" -Text "Host Computer" -BackgroundColor "#a6ffc2" -Links @(
-                New-UDLink -Url http://localhost:7777/192.168.0.102 -Text "Go to the Endpoint's Homepage"
-                )
-        }
-        New-UDColumn -Size 3 -Content {
-        New-UDCard -Title "192.168.0.150" -Text "Remote Computer" -BackgroundColor "#ffa6a6" 
-                New-UDButton -Text "Wake-on-LAN" -OnClick (
-                    New-UDEndpoint -Endpoint {
-                        Wake-on-LAN 
-                                            } )
-        }
-        New-UDColumn -Size 3 -Content {
-            New-UDCard -Title "192.168.0.150" -Text "Remote Computer" -BackgroundColor "#a6ffc2" -Links @(
-                New-UDLink -Url http://localhost:7777/192.168.0.150 -Text "Go to the Endpoint's Homepage"
-                )
+    New-UDCard  -Content {
+        New-UDHeading -Text "Network Scan" -Size 5
+
+        New-UDHeading -Size 6 -Content { "Retrieve the list of available computers on this network, using one of the 2 options" } 
+        
+        # New-UDTabContainer starts
+        New-UDTabContainer -Tabs {
+            # New-UDTab starts
+            New-UDTab -Text "Upload a CSV containing IPs and Passwords" -Content {
+                New-UDInput -Title "Browse" -SubmitText "Upload" -BackgroundColor "white" -Id "networkscan" -Content {
+                    New-UDInputField -Type binaryFile -Name file 
+                     } -Endpoint {
+                    param($File)
+                    Show-UDToast -Message "Dummy"
+                }            
             }
+            # New-UDTab ends
+            
+            # New-UDTab starts
+            New-UDTab -Text "Scan the Network" -Content {
+                New-UDRow -Endpoint {
+                    New-UDColumn -Endpoint {
+                        New-UDButton -Text "Scan Network" -OnClick {
+                            Show-UDToast -Message "Retrieving Network Details"
+                            RetrieveNetwork
+                            Show-UDToast -Message "Refresh the Page"
+                        }
+                    }
+                }
+            }
+            # New-UDTab ends
+        }
+        # New-UDTabContainer ends
+
     }
-}
+    
+    New-UDCard -Content {
+        New-UDHeading -Text "List of Available Computers" -Size 5
+        # New-UDPreloader -ProgressColor green
+        New-UDRow -Endpoint {
+            if($Cache:network -eq $null)
+            {
+                New-UDPreloader -ProgressColor green
+
+                RetrieveNetwork
+                DisplayNetworkEndpoints
+            }else{
+                Show-UDToast -Message "Loading directly from cache"
+                DisplayNetworkEndpoints
+            }
+        }
+    }
+}        
 
 $Contenthome =  {
         New-UDRow -Endpoint {    New-InstallSoftwareCard    } 
@@ -35,14 +69,17 @@ $Contenthome =  {
         New-UDRow -Endpoint {
             New-ListSoftwareCard
             } -AutoRefresh -RefreshInterval 5
+        
+        
+        #New-UDRow -Endpoint { New-CheckCard } 
 
         New-UDRow -Endpoint {
-        New-UDColumn -Size 6 -Content {
-            New-OverviewCard 
-        }
-        New-UDColumn -Size 6 -Content {
-            New-NetworkCard
-        } 
+            New-UDColumn -Size 6 -Content {
+                New-OverviewCard 
+            }
+            New-UDColumn -Size 6 -Content {
+                New-NetworkCard
+            } 
         } -AutoRefresh -RefreshInterval 60
 
         New-UDRow -Endpoint {
@@ -55,23 +92,23 @@ $Contenthome =  {
         } -AutoRefresh -RefreshInterval 1
         New-UDRow -Endpoint {
             New-UDColumn -Size 12 -Content {
-                Get-Processes
+                Get_Processes
             } 
         }
         New-UDRow -Endpoint {
             New-UDColumn -Size 6 -Content {
-                CPU-Monitor
+                CPU_Monitor
             } 
             New-UDColumn -Size 6 -Content {
-                Memory-Monitor
+                Memory_Monitor
             } 
         }
         New-UDRow -Endpoint {
             New-UDColumn -Size 6 -Content {
-                Disk-Monitor
+                Disk_Monitor
             } 
             New-UDColumn -Size 6 -Content {
-                Network-Monitor
+                Network_Monitor
             } 
         }
 }
@@ -88,10 +125,11 @@ $Contentaway =  {
             New-UDColumn -Size 2 -Content {
                 New-UDButton -Text "Lock Computer" -OnClick (
                     New-UDEndpoint -Endpoint {
-                        Show-UDToast -Message "Initiaing RemoteLock !"
-                        RemoteLock 
-                                            } )
-                        }
+                            Show-UDToast -Message "Initiaing RemoteLock !"
+                            RemoteLock 
+                    } 
+                )
+            }
             New-UDColumn -Size 2 -Content {
                 New-UDButton -Text "Restart Computer" -OnClick (
                     New-UDEndpoint -Endpoint {
@@ -108,7 +146,7 @@ $Contentaway =  {
                                         }                        
     }
 
-    New-UDRow -Endpoint {   New-InstallSoftwareCardAway    } 
+    New-UDRow -Endpoint {   New-InstallSoftwareCardAway  } 
 
     New-UDRow -Endpoint {
         New-UninstallSoftwareCardAway
@@ -137,23 +175,23 @@ $Contentaway =  {
     } -AutoRefresh -RefreshInterval 1
     # New-UDRow -Endpoint {
     #     New-UDColumn -Size 12 -Content {
-    #         Get-ProcessesAway
+    #         Get_ProcessesAway
     #     } 
     # }
     # New-UDRow -Endpoint {
     #     New-UDColumn -Size 6 -Content {
-    #         CPU-MonitorAway
+    #         CPU_MonitorAway
     #     } 
     #     New-UDColumn -Size 6 -Content {
-    #         Memory-MonitorAway
+    #         Memory_MonitorAway
     #     } 
     # }
     # New-UDRow -Endpoint {
     #     New-UDColumn -Size 6 -Content {
-    #         Disk-MonitorAway
+    #         Disk_MonitorAway
     #     } 
     #     New-UDColumn -Size 6 -Content {
-    #         Network-MonitorAway
+    #         Network_MonitorAway
     #     } 
     # }
 }
@@ -168,11 +206,16 @@ $AuthenticationMethod = New-UDAuthenticationMethod -Endpoint {
     New-UDAuthenticationResult -ErrorMessage "You are not Sachin Tendulkar !"
 }
 
+# $Pages = @()
+
+# foreach ($endpoint in $Cache:network) {
+#     $Page = 
+# }
 
 $LoginPage = New-UDLoginPage -AuthenticationMethod $AuthenticationMethod -PageBackgroundColor "#3f51b5"
 $HomePage = New-UDPage -Name "Home" -Icon home -Content $HomePageContent
-$Page1 = New-UDPage -Name "192.168.0.102" -Icon "laptop" -Content $Contenthome 
-$Page2 = New-UDPage -Name "192.168.0.150" -Icon "laptop" -Content $Contentaway
+$Page1 = New-UDPage -Name "192.168.0.151" -Icon "laptop" -Content $Contenthome 
+$Page2 = New-UDPage -Name "192.168.0.150" -Icon "laptop" -Endpoint $Contentaway
 $Page3 = New-UDPage  -Url "/Office365/Client/:clientguid" -Title "Office365Clients" -Icon "cloud" -Endpoint {
     param(
         [Parameter(
@@ -182,7 +225,7 @@ $Page3 = New-UDPage  -Url "/Office365/Client/:clientguid" -Title "Office365Clien
     )
     New-UDRow -Columns {
         New-UDColumn -MediumSize 2 -Id "Return" -Content {
-            New-UDButton -Text "Return to overview" -Flat -OnClick {
+            New-UDButton -Text "Return to overview $($clientguid)" -Flat -OnClick {
                 Invoke-UDRedirect -Url "http://localhost:7777/Home"
             }
         }
@@ -196,8 +239,10 @@ $EndpointInitialization = New-UDEndpointInitialization -Module @("$PSScriptRoot\
 # $null = $Pages.Insert(0,$HomePage)
 # $Page1 = New-UDPage -Name "aaaa" -Endpoint $FilesPageContent
 # $Page2 = New-UDPage -Name "Links" -Icon link -Content { New-UDCard }    
- $Dashboard  = New-UDDashboard -Title "Apache Heimdall - Endpoint Configuration Tool by @npranav10" -Pages @($HomePage,$Page1, $Page2,$Page3) -EndpointInitialization $EndpointInitialization #-LoginPage $LoginPage 
+
+$Dashboard  = New-UDDashboard -Title "Apache Heimdall - Endpoint Configuration Tool by @npranav10" -Pages @($HomePage,$Page1, $Page2,$Page3) -EndpointInitialization $EndpointInitialization #-LoginPage $LoginPage 
 
 # $Dashboard = New-UDDashboard -Title "$env:ComputerName - Endpoint Configuration Tool by @npranav10" -Content $Content  -EndpointInitialization $EndpointInitialization 
 
 Start-UDDashboard -Port 7777 -Dashboard $Dashboard -AdminMode -AutoReload -AllowHttpForLogin
+#Start-UDDashboard -Port 7777 -Dashboard $Dashboard -Wait

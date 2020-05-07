@@ -1,7 +1,6 @@
 ﻿###################################  Host Computer Cache Variables Section #############################################
 
-$Cache:Softwares = if (!([Diagnostics.Process]::GetCurrentProcess().Path -match '\\syswow64\\'))
-{
+$Cache:Softwares = if (!([Diagnostics.Process]::GetCurrentProcess().Path -match '\\syswow64\\')) {
   $unistallPath = "\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\"
   $unistallWow6432Path = "\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\"
   @(
@@ -17,9 +16,16 @@ $Cache:Softwares = if (!([Diagnostics.Process]::GetCurrentProcess().Path -match 
   Sort-Object DisplayName |
   Select-Object DisplayName , InstallDate, EstimatedSize , DisplayVersion, UninstallString 
 }
+
 $Cache:MyVariable = 1
 
 ###################################   Host Computer Functions Section #####################################
+
+function GetHostEndpointIP {
+    $t = Get-NetIPAddress | Where-Object {$_.InterfaceAlias -eq "Wi-Fi" -and $_.AddressFamily -eq "IPv4"} | Select-Object IPAddress
+    return $t.IPAddress
+}
+
 
 function New-ListSoftwareCard {
        New-UDTable -Title "Software" -Id "softwarelist" -Style striped -Header @("Name", "Installed On","Version", "Size") -BackgroundColor "#adc3ff" -Content {
@@ -101,7 +107,7 @@ function New-UninstallSoftwareCard {
     Catch {
     Try{
         $ModuleName = $Cache:MyVariable
-     Get-ChildItem -Path HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall, HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall -ErrorAction SilentlyContinue | Get-ItemProperty | Where-Object {$ModuleName -contains $_.DisplayName} | % {  $UninstallString = $_.UninstallString -replace '-runfromtemp -l0x0009anything -removeonly','-s -runfromtemp -l0x0409 anything -removeonly' -split ' ',2 # adds the -s to make the
+     Get-ChildItem -Path HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall, HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall -ErrorAction SilentlyContinue | Get-ItemProperty | Where-Object {$ModuleName -contains $_.DisplayName} | ForEach-Object {  $UninstallString = $_.UninstallString -replace '-runfromtemp -l0x0009anything -removeonly','-s -runfromtemp -l0x0409 anything -removeonly' -split ' ',2 # adds the -s to make the
       Invoke-Expression "cmd /c '$UninstallString'" 
      } 
      Show-UDToast -Message "Uninstalled $Name Successfully via CMD"
@@ -143,13 +149,14 @@ function New-UninstallSoftwareCard {
 
 function New-CheckCard{
 
-    New-UDCard -Title "Software" -Content {
-    New-UDLayout -Columns 1 -Content {New-UDTable -Title "Process Ids" -Header @("Select") -Content {
-    foreach($s in $Cache:Softwares) {
-    New-UDCheckbox -Label $s.DisplayName -OnChange {
-    Show-UDToast -Message $EventData
-    }
-    }}}
+    New-UDLayout -Columns 1 -Content {
+        New-UDTable -Title "Process Ids" -Header @("Select") -Content {
+            foreach($s in $Cache:Softwares) {
+                New-UDCheckbox -Label "$($s.DisplayName)" -OnChange {
+                    Show-UDToast -Message "$($s.DisplayName)"
+                }
+            }
+        }
     }
 }
 
@@ -179,7 +186,7 @@ function New-OverviewCard {
 }
 
 function New-NetworkCard {
-    $EnabledAdapters = (Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled})
+    $EnabledAdapters = (Get-wmiObject Win32_networkAdapterConfiguration | Where-Object {$_.IPEnabled})
     $DefaultGateway = $EnabledAdapters.DefaultIPGateway | Where-Object { -not [String]::IsNullOrEmpty($_)}
     $DHCPServer = $EnabledAdapters.DHCPServer | Where-Object { -not [String]::IsNullOrEmpty($_)}
     $IPAddress = $EnabledAdapters.IPAddress | Where-Object { -not [String]::IsNullOrEmpty($_)}
@@ -208,8 +215,7 @@ function New-NetworkCard {
 }
 
 function New-StorageCard {
-    $Disks = Get-WMIObject -Class Win32_LogicalDisk | Where {$_.DriveType -ne "5"}
-
+    $Disks = Get-WMIObject -Class Win32_LogicalDisk | Where-Object {$_.DriveType -ne "5"}
     New-UDCard -Title 'Storage' -Content {
         foreach($disk in $disks) {
             New-UDElement -Tag "row" -Content {
@@ -239,32 +245,85 @@ function New-Resource {
         
     }
 }
-function CPU-Monitor{
+function CPU_Monitor{
     New-UdMonitor -Title "CPU (% processor time)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#80FF6B63' -ChartBorderColor '#FFFF6B63'  -Endpoint {
         Get-Counter '\Processor(_Total)\% Processor Time' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue | Out-UDMonitorData
    }
 }
-function Memory-Monitor{
+function Memory_Monitor{
     New-UdMonitor -Title "Memory Usage %" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#9591eb' -ChartBorderColor '#3459eb'  -Endpoint {
         Get-Counter '\memory\% committed bytes in use' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue | Out-UDMonitorData
    }
 }
-function Disk-Monitor{
+function Disk_Monitor{
     New-UdMonitor -Title "Disk Usage (Metric TBA)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#9aeb91' -ChartBorderColor '#46eb34'  -Endpoint {
         Get-Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue | Out-UDMonitorData
    }
 }
 
-function Network-Monitor{
+function Network_Monitor{
     New-UdMonitor -Title "Network Usage (Up + Down) (Metric TBA)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#fad678' -ChartBorderColor '#e3b029'  -Endpoint {
-    Get-Counter "\Network Adapter(*)\Bytes Total/sec" | Select-Object -ExpandProperty CounterSamples | where {$_.CookedValue -ne 0} | Select-Object -ExpandProperty CookedValue | Out-UDMonitorData
+    Get-Counter "\Network Adapter(*)\Bytes Total/sec" | Select-Object -ExpandProperty CounterSamples | Where-Object {$_.CookedValue -ne 0} | Select-Object -ExpandProperty CookedValue | Out-UDMonitorData
     }
 }
-function Get-Processes{
+function Get_Processes{
     New-UdGrid -Title "Processes" -Headers @("Name", "ID", "Working Set", "CPU") -Properties @("Name", "Id", "WorkingSet", "CPU") -AutoRefresh -RefreshInterval 60 -Endpoint {
-        Get-Process | Select Name,ID,WorkingSet,CPU | Out-UDGridData
+        Get-Process | Select-Object Name,ID,WorkingSet,CPU | Out-UDGridData
  }
 }
+
+function RetrieveNetwork {
+    $endpoints = Import-csv "./endpoints.csv"
+    $network = @() 
+    foreach ($endpoint in $endpoints)
+    {
+        $status = @{ "IP" = $endpoint.IP}
+        $status.Password=$endpoint.Password
+        if (Test-Connection $endpoint.IP -Count 1 -ea 0 -Quiet)
+        {
+            $status["Results"] = "Up"
+        }else
+        {
+            $status["Results"] = "Down"
+        }
+        $serverStatus = New-Object -TypeName PSObject -Property $status
+        $network += $serverStatus
+    }
+    $Cache:network =  $network
+}
+
+function DisplayNetworkEndpoints {
+    foreach ($endpoint in $Cache:network) 
+    {
+        New-UDColumn -Size 3 -Content {
+            if ($endpoint.Results -eq "Up")
+            {
+                $text = $null
+                $BackgroundColor = $null
+                $hostIP = GetHostEndpointIP
+                if ($endpoint.IP -eq $hostIP){
+                    $text = "Host Computer"
+                    $BackgroundColor = "#6eff9b"
+                }
+                else{
+                    $text = "Remote Computer"
+                    $BackgroundColor = "#a6ffc2"
+                }
+                New-UDCard -Title "$($endpoint.IP)" -Text $text -BackgroundColor $BackgroundColor -Links @(
+                    New-UDLink -OpenInNewWindow True -Url ("http://localhost:7777/"+"$($endpoint.IP)").toString() -Text "Go to the Endpoint's Homepage"
+                    )            
+            }else
+            {
+                New-UDCard -Title "$($endpoint.IP)"  -BackgroundColor "#ffa6a6"  -Content {
+                        New-UDButton -Text "Wake-on-LAN" -OnClick (
+                            New-UDEndpoint -Endpoint {Wake_on_LAN } )}
+            }
+        }
+    }  
+    
+}
+
+
 
 ###################################   Common Functions Section #####################################
 
@@ -338,3 +397,4 @@ function ConvertTo-Fahrenheit {
 
     (($value /10 -273.15) *1.8 +32)
 }
+

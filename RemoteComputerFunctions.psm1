@@ -80,7 +80,6 @@ function InstallSoftwareCard_Away {
             Copy-Item -Path $installstring -ToSession $Cache:Session -Destination 'C:\'
             Show-UDToast -Message "Preparing to Install"
             $t = "C:\"+"$($installstring)"
-            #    .\PsExec.exe \\DESKTOP-K3ENCUE -u "kppn1" -p "Hunter1999" -d $t
             Invoke-Command  -ScriptBlock {
                 param($installstring)
                 $t = "C:\"+"$($installstring)"

@@ -137,10 +137,7 @@ $RemoteEndpointDynamicPage = New-UDPage -Url "/:IP" -Title "Remote Computer Page
         )]
         $IP
     )
-    # $Cache:RemoteCompIP = "192.168.0.150"
-    # $Cache:RemoteCompUser = "hulk"
-    # $Cache:RemoteCompPwd = "LukaModric10"
-    
+  
     ###################################  Remote Computer : Cache Variables Section #############################################
 
     $t = $Cache:network | Where-Object IP -eq $IP

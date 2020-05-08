@@ -245,16 +245,19 @@ function New-Resource {
         
     }
 }
+
 function CPU_Monitor{
     New-UdMonitor -Title "CPU (% processor time)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#80FF6B63' -ChartBorderColor '#FFFF6B63'  -Endpoint {
         Get-Counter '\Processor(_Total)\% Processor Time' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue | Out-UDMonitorData
    }
 }
+
 function Memory_Monitor{
     New-UdMonitor -Title "Memory Usage %" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#9591eb' -ChartBorderColor '#3459eb'  -Endpoint {
         Get-Counter '\memory\% committed bytes in use' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue | Out-UDMonitorData
    }
 }
+
 function Disk_Monitor{
     New-UdMonitor -Title "Disk Usage (Metric TBA)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#9aeb91' -ChartBorderColor '#46eb34'  -Endpoint {
         Get-Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue | Out-UDMonitorData
@@ -266,11 +269,14 @@ function Network_Monitor{
     Get-Counter "\Network Adapter(*)\Bytes Total/sec" | Select-Object -ExpandProperty CounterSamples | Where-Object {$_.CookedValue -ne 0} | Select-Object -ExpandProperty CookedValue | Out-UDMonitorData
     }
 }
+
 function Get_Processes{
     New-UdGrid -Title "Processes" -Headers @("Name", "ID", "Working Set", "CPU") -Properties @("Name", "Id", "WorkingSet", "CPU") -AutoRefresh -RefreshInterval 60 -Endpoint {
         Get-Process | Select-Object Name,ID,WorkingSet,CPU | Out-UDGridData
  }
 }
+
+###################################   HomePage Functions Section #####################################
 
 function RetrieveNetwork {
     $endpoints = Import-csv "./endpoints.csv"
@@ -278,6 +284,7 @@ function RetrieveNetwork {
     foreach ($endpoint in $endpoints)
     {
         $status = @{ "IP" = $endpoint.IP}
+        $status.User = $endpoint.User
         $status.Password=$endpoint.Password
         if (Test-Connection $endpoint.IP -Count 1 -ea 0 -Quiet)
         {
@@ -300,8 +307,8 @@ function DisplayNetworkEndpoints {
             {
                 $text = $null
                 $BackgroundColor = $null
-                $hostIP = GetHostEndpointIP
-                if ($endpoint.IP -eq $hostIP){
+                $Cache:hostIP = GetHostEndpointIP
+                if ($endpoint.IP -eq $Cache:hostIP){
                     $text = "Host Computer"
                     $BackgroundColor = "#6eff9b"
                 }

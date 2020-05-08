@@ -1,38 +1,6 @@
 ﻿
-$Cache:RemoteCompIP = "192.168.0.150"
-$Cache:RemoteCompUser = "hulk"
-$Cache:RemoteCompPwd = "LukaModric10"
-
-$Cache:password = ConvertTo-SecureString $Cache:RemoteCompPwd  -AsPlainText -Force
-$Cache:Cred  = New-Object System.Management.Automation.PSCredential ($Cache:RemoteCompUser, $Cache:password)
-
-
-$Cache:Session = New-PSSession -ComputerName $Cache:RemoteCompIP -Credential $Cache:Cred
-###################################  Remote Computer Cache Variables Section #############################################
-
-$Cache:SoftwaresAway = Invoke-Command -ScriptBlock {
-    if (!([Diagnostics.Process]::GetCurrentProcess().Path -match '\\syswow64\\'))
-    {
-    $unistallPath = "\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\"
-    $unistallWow6432Path = "\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\"
-    @(
-    if (Test-Path "HKLM:$unistallWow6432Path" ) { Get-ChildItem "HKLM:$unistallWow6432Path"}
-    if (Test-Path "HKLM:$unistallPath" ) { Get-ChildItem "HKLM:$unistallPath" }
-    if (Test-Path "HKCU:$unistallWow6432Path") { Get-ChildItem "HKCU:$unistallWow6432Path"}
-    if (Test-Path "HKCU:$unistallPath" ) { Get-ChildItem "HKCU:$unistallPath" }
-    ) |
-    ForEach-Object { Get-ItemProperty $_.PSPath } |
-    Where-Object {
-    $_.DisplayName -and !$_.SystemComponent -and !$_.ReleaseType -and !$_.ParentKeyName -and ($_.UninstallString -or $_.NoRemove)
-    } |
-    Sort-Object DisplayName |
-    Select-Object DisplayName , InstallDate, EstimatedSize , DisplayVersion, UninstallString 
-    }
-} -Session $Cache:Session
-
-$Cache:MyVariable = 1
-
 ###################################   Remote Computer Functions Section #####################################
+
 function Wake_on_LAN {
     <# 
     .SYNOPSIS  
@@ -85,13 +53,13 @@ function RemoteShutdown {
     # Invoke-Command -Session $Session -ScriptBlock {Stop-Computer -Force}
 }
 
-function New-ListSoftwareCardAway {
+function ListSoftwareCard_Away {
     New-UDTable -Title "Software" -Id "softwarelist" -Style striped -Header @("Name", "Installed On","Version", "Size") -BackgroundColor "#adc3ff" -Content {
 
         $Cache:SoftwaresAway | Out-UDTableData -Property @("DisplayName", "InstallDate","DisplayVersion", "EstimatedSize")}
 }
 
-function New-InstallSoftwareCardAway {
+function InstallSoftwareCard_Away {
     #$Session1 = New-PSSession -ComputerName $Cache:RemoteCompIP -Credential $Cache:Cred
     
     #$computername = Invoke-Command -ScriptBlock {hostname} -Session $Session1
@@ -125,7 +93,7 @@ function New-InstallSoftwareCardAway {
     
 }
 
-function New-UninstallSoftwareCardAway{
+function UninstallSoftwareCard_Away {
     $Session = New-PSSession -ComputerName $Cache:RemoteCompIP -Credential $Cache:Cred
 
     New-UDCard -Title "Uninstall Software" -Id "acard" -Content {
@@ -197,7 +165,7 @@ function New-UninstallSoftwareCardAway{
     }
 }
 
-function New-CheckCardAway {
+function CheckCard_Away {
     New-UDCard -Title "Software" -Content {
         New-UDLayout -Columns 1 -Content {New-UDTable -Title "Process Ids" -Header @("Select") -Content 
             {
@@ -210,7 +178,7 @@ function New-CheckCardAway {
     }
 }
 
-function New-OverviewCardAway {
+function OverviewCard_Away {
 
         # $RemOSLastBootupTime = Invoke-Command -ScriptBlock {Powershell "(Get-CimInstance -ClassName win32_operatingsystem | select lastbootuptime)"} -Session $Session
         # $RemOSCaption = Invoke-Command -ScriptBlock {Powershell "(Get-CimInstance -ClassName win32_operatingsystem | select caption)"} -Session $Session
@@ -239,7 +207,7 @@ function New-OverviewCardAway {
     }
 }
 
-function New-NetworkCardAway {
+function NetworkCard_Away {
     $EnabledAdapters = Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred -ScriptBlock {(Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled})}
     $DefaultGateway = $EnabledAdapters.DefaultIPGateway | Where-Object { -not [String]::IsNullOrEmpty($_)}
     $DHCPServer = $EnabledAdapters.DHCPServer | Where-Object { -not [String]::IsNullOrEmpty($_)}
@@ -269,7 +237,7 @@ function New-NetworkCardAway {
     }
 }
 
-function New-StorageCardAway {
+function StorageCard_Away {
     $Disks = Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred -ScriptBlock {(Get-WMIObject -Class Win32_LogicalDisk | Where {$_.DriveType -ne "5"})}
 
     New-UDCard -Title 'Storage' -Content {
@@ -281,7 +249,7 @@ function New-StorageCardAway {
     }
 }
 
-function New-ResourceAway {
+function Resource_Away {
     $OperatingSystem = Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred -ScriptBlock {Get-WMIObject -Class Win32_OperatingSystem} 
     $CPU = Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred -ScriptBlock {Get-WMIObject -Class Win32_Processor} 
     
@@ -296,40 +264,44 @@ function New-ResourceAway {
     }
 }
 
-# function CPU_MonitorAway{
-#     New-UdMonitor -Title "CPU (% processor time)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#80FF6B63' -ChartBorderColor '#FFFF6B63'  -Endpoint {
-#         $t =  Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred -ScriptBlock {   Get-Counter '\Processor(_Total)\% Processor Time' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue 
-#     }
-#     $t | Out-UDGridData
-#  } 
-# }
-# function Memory_MonitorAway{
-#     New-UdMonitor -Title "Memory Usage %" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#9591eb' -ChartBorderColor '#3459eb'  -Endpoint {
-#         $t =  Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred -ScriptBlock {   Get-Counter '\memory\% committed bytes in use' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue
-#     }
-#     $t | Out-UDGridData
-#  } 
-# }
-# function Disk_MonitorAway{
-#     New-UdMonitor -Title "Disk Usage (Metric TBA)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#9aeb91' -ChartBorderColor '#46eb34'  -Endpoint {
-#         $t =  Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred -ScriptBlock {   Get-Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue
-#     }
-#     $t | Out-UDGridData
-#  } 
-# }
-# function Network_MonitorAway{
-#     $t =  Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred -ScriptBlock {Get-Counter "\Network Adapter(*)\Bytes Total/sec" | Select-Object -ExpandProperty CounterSamples | where {$_.CookedValue -ne 0} | Select-Object -ExpandProperty CookedValue
-#  }
-#     New-UdMonitor -Title "Network Usage (Up + Down) (Metric TBA)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#fad678' -ChartBorderColor '#e3b029'  -Endpoint {
-#     $t | Out-UDGridData
-#  } 
-# }
-# function Get-ProcessesAway{
-#     New-UdGrid -Title "Processes" -Headers @("Name", "ID", "Working Set", "CPU") -Properties @("Name", "Id", "WorkingSet", "CPU") -AutoRefresh -RefreshInterval 60 -Endpoint {
-#     $t =  Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred -ScriptBlock { Get-Process | Select Name,ID,WorkingSet,CPU   
-#     }
-#     $t | Out-UDGridData
-#  } 
-# }
+function CPUMonitor_Away{
+    New-UdMonitor -Title "CPU (% processor time)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#80FF6B63' -ChartBorderColor '#FFFF6B63'  -Endpoint {
+        $t =  Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred  -ScriptBlock {   Get-Counter '\Processor(_Total)\% Processor Time' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue 
+    }
+    $t | Out-UDGridData
+ } 
+}
+
+function MemoryMonitor_Away{
+    New-UdMonitor -Title "Memory Usage %" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#9591eb' -ChartBorderColor '#3459eb'  -Endpoint {
+        $t =  Invoke-Command -computername $Cache:RemoteCompIP -Credential $Cache:Cred -ScriptBlock {   Get-Counter '\memory\% committed bytes in use' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue
+    }
+    $t | Out-UDGridData
+ } 
+}
+
+function DiskMonitor_Away{
+    New-UdMonitor -Title "Disk Usage (Metric TBA)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#9aeb91' -ChartBorderColor '#46eb34'  -Endpoint {
+        $t =  Invoke-Command -Session $Cache:Session2 -ScriptBlock {   Get-Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CounterSamples | Select-Object -ExpandProperty CookedValue
+    }
+    $t | Out-UDGridData
+ } 
+}
+
+function NetworkMonitor_Away{
+    $t =  Invoke-Command -Session $Cache:Session2  -ScriptBlock {Get-Counter "\Network Adapter(*)\Bytes Total/sec" | Select-Object -ExpandProperty CounterSamples | where {$_.CookedValue -ne 0} | Select-Object -ExpandProperty CookedValue
+ }
+    New-UdMonitor -Title "Network Usage (Up + Down) (Metric TBA)" -Type Line -DataPointHistory 20 -RefreshInterval 5 -ChartBackgroundColor '#fad678' -ChartBorderColor '#e3b029'  -Endpoint {
+    $t | Out-UDGridData
+ } 
+}
+
+function ProcessViewer_Away{
+    New-UdGrid -Title "Processes" -Headers @("Name", "ID", "Working Set", "CPU") -Properties @("Name", "Id", "WorkingSet", "CPU") -AutoRefresh -RefreshInterval 60 -Endpoint {
+    $t =  Invoke-Command -Session $Cache:Session2 -ScriptBlock { Get-Process | Select Name,ID,WorkingSet,CPU   
+    }
+    $t | Out-UDGridData
+ } 
+}
 
 

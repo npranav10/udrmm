@@ -1,6 +1,5 @@
 Get-UDDashboard | Stop-UDDashboard
 
-
 Import-Module (Join-Path $PSScriptRoot 'HomeComputerFunctions.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'RemoteComputerFunctions.psm1') -Force
 
@@ -59,7 +58,7 @@ $HomePageContent = {
     }
 }        
 
-$Contenthome =  {
+$Content_HostEndpointStaticPage =  {
         New-UDRow -Endpoint {    New-InstallSoftwareCard    } 
         
         New-UDRow -Endpoint {
@@ -113,89 +112,6 @@ $Contenthome =  {
         }
 }
 
-$Contentaway =  {
-    New-UDRow -Endpoint {
-            New-UDColumn -Size 2 -Content {
-                New-UDButton -Text "Remote Desktop" -OnClick (
-                    New-UDEndpoint -Endpoint {
-                        Show-UDToast -Message "Initiaing Remote Desktop connection !"
-                        RemoteDesktop 
-                                            } )
-            }
-            New-UDColumn -Size 2 -Content {
-                New-UDButton -Text "Lock Computer" -OnClick (
-                    New-UDEndpoint -Endpoint {
-                            Show-UDToast -Message "Initiaing RemoteLock !"
-                            RemoteLock 
-                    } 
-                )
-            }
-            New-UDColumn -Size 2 -Content {
-                New-UDButton -Text "Restart Computer" -OnClick (
-                    New-UDEndpoint -Endpoint {
-                        Show-UDToast -Message "Initiaing Remote Desktop connection !"
-                        RemoteRestart 
-                                            } )
-                                    }
-            New-UDColumn -Size 2 -Content {
-                New-UDButton -Text "Shutdown Computer" -OnClick (
-                    New-UDEndpoint -Endpoint {
-                        Show-UDToast -Message "Initiaing Remote Desktop connection !"
-                        RemoteShutdown 
-                                            } )     
-                                        }                        
-    }
-
-    New-UDRow -Endpoint {   New-InstallSoftwareCardAway  } 
-
-    New-UDRow -Endpoint {
-        New-UninstallSoftwareCardAway
-        } 
-
-    New-UDRow -Endpoint {
-        New-ListSoftwareCardAway
-        } -AutoRefresh -RefreshInterval 5
-
-    New-UDRow -Endpoint {
-    New-UDColumn -Size 6 -Content {
-       New-OverviewCardAway 
-    }
-    New-UDColumn -Size 6 -Content {
-        New-NetworkCardAway
-    } 
-    } -AutoRefresh -RefreshInterval 60
-
-    New-UDRow -Endpoint {
-        New-UDColumn -Size 6 -Content {
-            New-StorageCardAway
-        } 
-        New-UDColumn -Size 6 -Content {
-            New-ResourceAway
-        } 
-    } -AutoRefresh -RefreshInterval 1
-    # New-UDRow -Endpoint {
-    #     New-UDColumn -Size 12 -Content {
-    #         Get_ProcessesAway
-    #     } 
-    # }
-    # New-UDRow -Endpoint {
-    #     New-UDColumn -Size 6 -Content {
-    #         CPU_MonitorAway
-    #     } 
-    #     New-UDColumn -Size 6 -Content {
-    #         Memory_MonitorAway
-    #     } 
-    # }
-    # New-UDRow -Endpoint {
-    #     New-UDColumn -Size 6 -Content {
-    #         Disk_MonitorAway
-    #     } 
-    #     New-UDColumn -Size 6 -Content {
-    #         Network_MonitorAway
-    #     } 
-    # }
-}
-
 $AuthenticationMethod = New-UDAuthenticationMethod -Endpoint {
     param([PSCredential]$Credentials)
 
@@ -206,43 +122,145 @@ $AuthenticationMethod = New-UDAuthenticationMethod -Endpoint {
     New-UDAuthenticationResult -ErrorMessage "You are not Sachin Tendulkar !"
 }
 
-# $Pages = @()
-
-# foreach ($endpoint in $Cache:network) {
-#     $Page = 
-# }
-
 $LoginPage = New-UDLoginPage -AuthenticationMethod $AuthenticationMethod -PageBackgroundColor "#3f51b5"
+
+$Cache:hostIP = GetHostEndpointIP
+
 $HomePage = New-UDPage -Name "Home" -Icon home -Content $HomePageContent
-$Page1 = New-UDPage -Name "192.168.0.151" -Icon "laptop" -Content $Contenthome 
-$Page2 = New-UDPage -Name "192.168.0.150" -Icon "laptop" -Endpoint $Contentaway
-$Page3 = New-UDPage  -Url "/Office365/Client/:clientguid" -Title "Office365Clients" -Icon "cloud" -Endpoint {
+$HostEndpointStaticPage = New-UDPage -Name "$($Cache:hostIP)" -Icon "laptop" -Content $Content_HostEndpointStaticPage 
+
+    
+$RemoteEndpointDynamicPage = New-UDPage -Url "/:IP" -Title "Remote Computer Page" -Icon "cloud" -Endpoint {
     param(
         [Parameter(
             Mandatory = $true
         )]
-        $clientguid
+        $IP
     )
-    New-UDRow -Columns {
-        New-UDColumn -MediumSize 2 -Id "Return" -Content {
-            New-UDButton -Text "Return to overview $($clientguid)" -Flat -OnClick {
-                Invoke-UDRedirect -Url "http://localhost:7777/Home"
-            }
-        }
-
-        }
-}
+    # $Cache:RemoteCompIP = "192.168.0.150"
+    # $Cache:RemoteCompUser = "hulk"
+    # $Cache:RemoteCompPwd = "LukaModric10"
     
-$EndpointInitialization = New-UDEndpointInitialization -Module @("$PSScriptRoot\HomeComputerFunctions.psm1", "$PSScriptRoot\RemoteComputerFunctions.psm1")
-#$EndpointInitialization = New-UDEndpointInitialization -Module @("$PSScriptRoot\HomeComputerFunctions.psm1")
-# $HomePage = New-UDPage -Name "Home" -Icon home -Content $HomePageContent
-# $null = $Pages.Insert(0,$HomePage)
-# $Page1 = New-UDPage -Name "aaaa" -Endpoint $FilesPageContent
-# $Page2 = New-UDPage -Name "Links" -Icon link -Content { New-UDCard }    
+    ###################################  Remote Computer : Cache Variables Section #############################################
 
-$Dashboard  = New-UDDashboard -Title "Apache Heimdall - Endpoint Configuration Tool by @npranav10" -Pages @($HomePage,$Page1, $Page2,$Page3) -EndpointInitialization $EndpointInitialization #-LoginPage $LoginPage 
+    $t = $Cache:network | Where-Object IP -eq $IP
+    $Cache:RemoteCompIP = $IP
+    $Cache:RemoteCompUser = $t.User
+    $Cache:RemoteCompPwd = $t.Password
+    
+    $Cache:password = ConvertTo-SecureString $Cache:RemoteCompPwd  -AsPlainText -Force
+    $Cache:Cred  = New-Object System.Management.Automation.PSCredential ($Cache:RemoteCompUser, $Cache:password)
+    
+    
+    $Cache:Session = New-PSSession -ComputerName $Cache:RemoteCompIP -Credential $Cache:Cred
+    $Cache:Session2 = New-PSSession -ComputerName $Cache:RemoteCompIP -Credential $Cache:Cred
+    
+    $Cache:SoftwaresAway = Invoke-Command -ScriptBlock {
+        if (!([Diagnostics.Process]::GetCurrentProcess().Path -match '\\syswow64\\'))
+        {
+        $unistallPath = "\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\"
+        $unistallWow6432Path = "\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\"
+        @(
+        if (Test-Path "HKLM:$unistallWow6432Path" ) { Get-ChildItem "HKLM:$unistallWow6432Path"}
+        if (Test-Path "HKLM:$unistallPath" ) { Get-ChildItem "HKLM:$unistallPath" }
+        if (Test-Path "HKCU:$unistallWow6432Path") { Get-ChildItem "HKCU:$unistallWow6432Path"}
+        if (Test-Path "HKCU:$unistallPath" ) { Get-ChildItem "HKCU:$unistallPath" }
+        ) |
+        ForEach-Object { Get-ItemProperty $_.PSPath } |
+        Where-Object {
+        $_.DisplayName -and !$_.SystemComponent -and !$_.ReleaseType -and !$_.ParentKeyName -and ($_.UninstallString -or $_.NoRemove)
+        } |
+        Sort-Object DisplayName |
+        Select-Object DisplayName , InstallDate, EstimatedSize , DisplayVersion, UninstallString 
+        }
+    } -Session $Cache:Session
+    
+    $Cache:MyVariable = 1
 
-# $Dashboard = New-UDDashboard -Title "$env:ComputerName - Endpoint Configuration Tool by @npranav10" -Content $Content  -EndpointInitialization $EndpointInitialization 
+    ###################################  Remote Computer : UD Variables Section #############################################
+
+    New-UDRow -Endpoint {
+        New-UDColumn -Size 2 -Content {
+            New-UDButton -Text "Remote Desktop" -OnClick (
+                New-UDEndpoint -Endpoint {
+                    Show-UDToast -Message "Initiaing Remote Desktop connection !"
+                    RemoteDesktop 
+                                        } )
+        }
+        New-UDColumn -Size 2 -Content {
+            New-UDButton -Text "Lock Computer" -OnClick (
+                New-UDEndpoint -Endpoint {
+                        Show-UDToast -Message "Initiaing RemoteLock !"
+                        RemoteLock 
+                } 
+            )
+        }
+        New-UDColumn -Size 2 -Content {
+            New-UDButton -Text "Restart Computer" -OnClick (
+                New-UDEndpoint -Endpoint {
+                    Show-UDToast -Message "Initiaing Remote Desktop connection !"
+                    RemoteRestart 
+                                        } )
+                                }
+        New-UDColumn -Size 2 -Content {
+            New-UDButton -Text "Shutdown Computer" -OnClick (
+                New-UDEndpoint -Endpoint {
+                    Show-UDToast -Message "Initiaing Remote Desktop connection !"
+                    RemoteShutdown 
+                                        } )     
+                                    }                        
+    }
+
+    New-UDRow -Endpoint { InstallSoftwareCard_Away } 
+
+    New-UDRow -Endpoint { UninstallSoftwareCard_Away } 
+
+    New-UDRow -Endpoint {
+        ListSoftwareCard_Away
+        } -AutoRefresh -RefreshInterval 5
+
+    New-UDRow -Endpoint {
+        New-UDColumn -Size 6 -Content {
+            OverviewCard_Away 
+        }
+        New-UDColumn -Size 6 -Content {
+            NetworkCard_Away
+        } 
+    } -AutoRefresh -RefreshInterval 60
+
+    New-UDRow -Endpoint {
+        New-UDColumn -Size 6 -Content {
+            StorageCard_Away
+        } 
+        New-UDColumn -Size 6 -Content {
+            Resource_Away
+        } 
+    } -AutoRefresh -RefreshInterval 1
+    # New-UDRow -Endpoint {
+    #     New-UDColumn -Size 12 -Content {
+    #         ProcessViewer_Away
+    #     } 
+    # }
+    # New-UDRow -Endpoint {
+    #     New-UDColumn -Size 6 -Content {
+    #         CPUMonitor_Away
+    #     } 
+    #     New-UDColumn -Size 6 -Content {
+    #         MemoryMonitor_Away
+    #     } 
+    # }-AutoRefresh -RefreshInterval 2
+    # New-UDRow -Endpoint {
+    #     New-UDColumn -Size 6 -Content {
+    #         DiskMonitor_Away
+    #     } 
+    #     New-UDColumn -Size 6 -Content {
+    #         NetworkMonitor_Away
+    #     } 
+    # }
+}
+
+$EndpointInitialization = New-UDEndpointInitialization -Module @("$PSScriptRoot\HomeComputerFunctions.psm1","$PSScriptRoot\RemoteComputerFunctions.psm1")
+
+$Dashboard  = New-UDDashboard -Title "Apache Heimdall - Endpoint Configuration Tool by @npranav10" -Pages @($HomePage,$HostEndpointStaticPage,$RemoteEndpointDynamicPage) -EndpointInitialization $EndpointInitialization #-LoginPage $LoginPage 
 
 Start-UDDashboard -Port 7777 -Dashboard $Dashboard -AdminMode -AutoReload -AllowHttpForLogin
-#Start-UDDashboard -Port 7777 -Dashboard $Dashboard -Wait
